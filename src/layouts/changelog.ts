@@ -16,6 +16,12 @@ export const formatChangelogLayout = (
   const webhookBody = formatCozyLayout(commit, conclusion, elapsedSeconds);
   const [ section ] = webhookBody.sections;
 
+  // Remove activityText
+  section.activityText = undefined;
+
+  // Set section facts
+  section.facts = [];
+
   section.changelog = [];
 
   // Set changelog

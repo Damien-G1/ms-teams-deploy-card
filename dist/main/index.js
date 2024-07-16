@@ -61998,6 +61998,8 @@ const cozy_1 = __nccwpck_require__(7799);
 const formatChangelogLayout = (commit, conclusion, elapsedSeconds, commits) => {
     const webhookBody = (0, cozy_1.formatCozyLayout)(commit, conclusion, elapsedSeconds);
     const [section] = webhookBody.sections;
+    section.activityText = undefined;
+    section.facts = [];
     section.changelog = [];
     for (const c of commits) {
         const escapedMessage = (0, utils_1.escapeMarkdownTokens)(c.commit.message);
