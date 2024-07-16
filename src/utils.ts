@@ -9,6 +9,7 @@ import { PotentialAction, WebhookBody } from './models';
 import { formatCompactLayout } from './layouts/compact';
 import { formatCozyLayout } from './layouts/cozy';
 import { formatCompleteLayout } from './layouts/complete';
+import { formatChangelogLayout } from './layouts/changelog';
 import { CustomAction, WorkflowRunStatus } from './types';
 
 export const escapeMarkdownTokens = (text: string) => text
@@ -20,10 +21,27 @@ export const escapeMarkdownTokens = (text: string) => text
   .replace(/-/g, `\\-`)
   .replace(/>/g, `\\>`);
 
+export const getCommits = async () => {
+  // Get the before and after of the event from the github context
+  const { before, after } = JSON.parse(getInput(`github-context`)).event;
+  const [ owner, repo ] = (process.env.GITHUB_REPOSITORY || ``).split(`/`);
+
+  // Get the commits between the before and after
+  const { data: commits } = await octokit.rest.repos.compareCommits({
+    base: before,
+    head: after,
+    owner,
+    repo,
+  });
+
+  return commits.commits;
+};
+
 export const getRunInformation = () => {
   const [ owner, repo ] = (process.env.GITHUB_REPOSITORY || ``).split(`/`);
   const branch = process.env.GITHUB_REF?.replace(`refs/heads/`, ``);
   const repoUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}`;
+
   return {
     branch,
     branchUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/tree/${branch}`,
@@ -63,6 +81,40 @@ export const submitNotification = async (webhookBody: WebhookBody) => {
   // Convert the image to a base64 string
   const themeColorBase64 = await image.getBase64Async(Jimp.MIME_PNG);
 
+  interface RichTextBlock {
+    type: 'RichTextBlock';
+    inlines: Array<{ text: string, type: 'TextRun' }>;
+    spacing: 'None';
+    wrap: boolean;
+  }
+
+  interface TextBlock {
+    type: 'TextBlock';
+    text: string;
+    wrap: boolean;
+    spacing: 'None' | 'Default';
+    isSubtle?: boolean;
+    weight?: 'Bolder';
+    size?: 'Medium';
+    FontType?: 'Monospace';
+  }
+
+  interface Column {
+    type: 'Column';
+    width: 'auto' | 'stretch';
+    items: TextBlock[];
+  }
+
+  interface ColumnSet {
+    type: 'ColumnSet';
+    columns: Column[];
+  }
+
+  interface Container {
+    type: 'Container';
+    items: Array<TextBlock | RichTextBlock | ColumnSet | Container>;
+  }
+
   const webhookBodyJson = JSON.stringify({
     attachments: [{
       content: {
@@ -93,8 +145,8 @@ export const submitNotification = async (webhookBody: WebhookBody) => {
               wrap: true,
             },
           ] : [],
-          ...sections.map((section) => ({
-            items: [
+          ...sections.map((section) => {
+            const items = [
               {
                 columns: [
                   {
@@ -104,7 +156,6 @@ export const submitNotification = async (webhookBody: WebhookBody) => {
                         style: `Default`,
                         type: `Image`,
                         url: section.activityImage,
-                        // style: `Person`,
                       },
                     ],
                     type: `Column`,
@@ -127,14 +178,13 @@ export const submitNotification = async (webhookBody: WebhookBody) => {
                         type: `TextBlock`,
                         wrap: true,
                       },
-                      // activityText
                       section.activityText && {
                         spacing: `None`,
                         text: section.activityText,
                         type: `TextBlock`,
                         wrap: true,
                       },
-                    ],
+                    ].filter(Boolean),
                     type: `Column`,
                     width: `stretch`,
                   },
@@ -149,9 +199,74 @@ export const submitNotification = async (webhookBody: WebhookBody) => {
                 })),
                 type: `FactSet`,
               },
-            ],
-            type: `Container`,
-          })),
+              ...section?.changelog?.reduce<Container[]>((acc, changelogItem) => {
+                const changelog_items: Array<TextBlock | RichTextBlock | Container> = [];
+                changelog_items.push({
+                  isSubtle: true,
+                  spacing: `None`,
+                  text: `---`,
+                  type: `TextBlock`,
+                  wrap: true,
+                });
+                if (changelogItem.subtitle || changelogItem.title) {
+                  changelog_items.push({
+                    items: [
+                      {
+                        columns: [
+                          {
+                            items: [
+                              {
+                                FontType: `Monospace`,
+                                isSubtle: true,
+                                spacing: `None`,
+                                text: changelogItem.subtitle,
+                                type: `TextBlock`,
+                                wrap: true,
+                              },
+                            ],
+                            type: `Column`,
+                            width: `auto`,
+                          },
+                          {
+                            items: [
+                              {
+                                size: `Medium`,
+                                spacing: `Default`,
+                                text: changelogItem.title,
+                                type: `TextBlock`,
+                                weight: `Bolder`,
+                                wrap: true,
+                              },
+                            ],
+                            type: `Column`,
+                            width: `stretch`,
+                          },
+                        ],
+                        type: `ColumnSet`,
+                      },
+                    ],
+                    type: `Container`,
+                  });
+                }
+                if (changelogItem.description) {
+                  changelog_items.push({
+                    inlines: [
+                      {
+                        text: changelogItem.description,
+                        type: `TextRun`,
+                      },
+                    ],
+                    spacing: `None`,
+                    type: `RichTextBlock`,
+                    wrap: true,
+                  });
+                }
+                acc.push({ items: changelog_items, type: `Container` });
+                return acc;
+              }, []) || [],
+            ];
+            return { items, type: `Container` };
+          }),
         ],
         msteams: {
           width: `full`,
@@ -174,7 +289,7 @@ export const submitNotification = async (webhookBody: WebhookBody) => {
   })
     .then((response: Response) => {
       setOutput(`webhook-body`, webhookBodyJson);
-      info(webhookBodyJson);
+      // info(webhookBodyJson);
       return response;
     })
     .catch(error);
@@ -198,6 +313,15 @@ export const formatAndNotify = async (
       break;
     case `complete`:
       webhookBody = formatCompleteLayout(commit, conclusion, elapsedSeconds);
+      break;
+    case `changelog`: {
+        const commits = await getCommits();
+        if (commits.length === 0) {
+          info(`No commits found.`);
+          return;
+        }
+        webhookBody = formatChangelogLayout(commit, conclusion, elapsedSeconds, commits);
+      }
       break;
     default:
       setFailed(`Invalid card layout: ${cardLayout}`);

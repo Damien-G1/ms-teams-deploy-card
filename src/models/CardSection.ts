@@ -1,4 +1,4 @@
-import { Fact, PotentialAction } from '.';
+import { Fact, PotentialAction, ChangelogItem } from '.';
 
 export class CardSection {
   public activityTitle = ``;
@@ -7,4 +7,5 @@ export class CardSection {
   public activityText?: string;
   public facts?: Fact[];
   public potentialAction?: PotentialAction[];
+  public changelog?: ChangelogItem[];
 }

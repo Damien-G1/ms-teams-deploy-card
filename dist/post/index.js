@@ -61985,6 +61985,34 @@ exports.CONCLUSION_THEMES = {
 
 /***/ }),
 
+/***/ 783:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.formatChangelogLayout = void 0;
+const utils_1 = __nccwpck_require__(1314);
+const models_1 = __nccwpck_require__(2859);
+const cozy_1 = __nccwpck_require__(7799);
+const formatChangelogLayout = (commit, conclusion, elapsedSeconds, commits) => {
+    const webhookBody = (0, cozy_1.formatCozyLayout)(commit, conclusion, elapsedSeconds);
+    const [section] = webhookBody.sections;
+    section.changelog = [];
+    for (const c of commits) {
+        const escapedMessage = (0, utils_1.escapeMarkdownTokens)(c.commit.message);
+        const [title, ...messageLines] = escapedMessage.split(`\n\n`);
+        const message = messageLines.join(`\n\n`) || ``;
+        const commitShort = c.sha.substring(0, 7);
+        section.changelog.push(new models_1.ChangelogItem(title, commitShort, message));
+    }
+    return webhookBody;
+};
+exports.formatChangelogLayout = formatChangelogLayout;
+
+
+/***/ }),
+
 /***/ 1464:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -62180,6 +62208,25 @@ exports.CardSection = CardSection;
 
 /***/ }),
 
+/***/ 5200:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ChangelogItem = void 0;
+class ChangelogItem {
+    constructor(title, subtitle, description) {
+        this.title = title;
+        this.subtitle = subtitle;
+        this.description = description;
+    }
+}
+exports.ChangelogItem = ChangelogItem;
+
+
+/***/ }),
+
 /***/ 3762:
 /***/ ((__unused_webpack_module, exports) => {
 
@@ -62250,6 +62297,7 @@ tslib_1.__exportStar(__nccwpck_require__(3913), exports);
 tslib_1.__exportStar(__nccwpck_require__(3762), exports);
 tslib_1.__exportStar(__nccwpck_require__(4108), exports);
 tslib_1.__exportStar(__nccwpck_require__(6379), exports);
+tslib_1.__exportStar(__nccwpck_require__(5200), exports);
 
 
 /***/ }),
@@ -62275,7 +62323,7 @@ exports.octokit = (0, github_1.getOctokit)(githubToken);
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.renderActions = exports.getWorkflowRunStatus = exports.formatAndNotify = exports.submitNotification = exports.getOctokitCommit = exports.getRunInformation = exports.escapeMarkdownTokens = void 0;
+exports.renderActions = exports.getWorkflowRunStatus = exports.formatAndNotify = exports.submitNotification = exports.getOctokitCommit = exports.getRunInformation = exports.getCommits = exports.escapeMarkdownTokens = void 0;
 const tslib_1 = __nccwpck_require__(4351);
 const core_1 = __nccwpck_require__(2186);
 const node_fetch_1 = tslib_1.__importDefault(__nccwpck_require__(4429));
@@ -62287,6 +62335,7 @@ const models_1 = __nccwpck_require__(2859);
 const compact_1 = __nccwpck_require__(1464);
 const cozy_1 = __nccwpck_require__(7799);
 const complete_1 = __nccwpck_require__(6183);
+const changelog_1 = __nccwpck_require__(783);
 const escapeMarkdownTokens = (text) => text
     .replace(/\n {1,}/g, `\n `)
     .replace(/_/g, `\\_`)
@@ -62296,6 +62345,18 @@ const escapeMarkdownTokens = (text) => text
     .replace(/-/g, `\\-`)
     .replace(/>/g, `\\>`);
 exports.escapeMarkdownTokens = escapeMarkdownTokens;
+const getCommits = async () => {
+    const { before, after } = JSON.parse((0, core_1.getInput)(`github-context`)).event;
+    const [owner, repo] = (process.env.GITHUB_REPOSITORY || ``).split(`/`);
+    const { data: commits } = await octokit_1.octokit.rest.repos.compareCommits({
+        base: before,
+        head: after,
+        owner,
+        repo,
+    });
+    return commits.commits;
+};
+exports.getCommits = getCommits;
 const getRunInformation = () => {
     var _a, _b;
     const [owner, repo] = (process.env.GITHUB_REPOSITORY || ``).split(`/`);
@@ -62360,8 +62421,9 @@ const submitNotification = async (webhookBody) => {
                                 wrap: true,
                             },
                         ] : [],
-                        ...sections.map((section) => ({
-                            items: [
+                        ...sections.map((section) => {
+                            var _a;
+                            const items = [
                                 {
                                     columns: [
                                         {
@@ -62399,7 +62461,7 @@ const submitNotification = async (webhookBody) => {
                                                     type: `TextBlock`,
                                                     wrap: true,
                                                 },
-                                            ],
+                                            ].filter(Boolean),
                                             type: `Column`,
                                             width: `stretch`,
                                         },
@@ -62414,9 +62476,74 @@ const submitNotification = async (webhookBody) => {
                                     })),
                                     type: `FactSet`,
                                 },
-                            ],
-                            type: `Container`,
-                        })),
+                                ...((_a = section === null || section === void 0 ? void 0 : section.changelog) === null || _a === void 0 ? void 0 : _a.reduce((acc, changelogItem) => {
+                                    const changelog_items = [];
+                                    changelog_items.push({
+                                        isSubtle: true,
+                                        spacing: `None`,
+                                        text: `---`,
+                                        type: `TextBlock`,
+                                        wrap: true,
+                                    });
+                                    if (changelogItem.subtitle || changelogItem.title) {
+                                        changelog_items.push({
+                                            items: [
+                                                {
+                                                    columns: [
+                                                        {
+                                                            items: [
+                                                                {
+                                                                    FontType: `Monospace`,
+                                                                    isSubtle: true,
+                                                                    spacing: `None`,
+                                                                    text: changelogItem.subtitle,
+                                                                    type: `TextBlock`,
+                                                                    wrap: true,
+                                                                },
+                                                            ],
+                                                            type: `Column`,
+                                                            width: `auto`,
+                                                        },
+                                                        {
+                                                            items: [
+                                                                {
+                                                                    size: `Medium`,
+                                                                    spacing: `Default`,
+                                                                    text: changelogItem.title,
+                                                                    type: `TextBlock`,
+                                                                    weight: `Bolder`,
+                                                                    wrap: true,
+                                                                },
+                                                            ],
+                                                            type: `Column`,
+                                                            width: `stretch`,
+                                                        },
+                                                    ],
+                                                    type: `ColumnSet`,
+                                                },
+                                            ],
+                                            type: `Container`,
+                                        });
+                                    }
+                                    if (changelogItem.description) {
+                                        changelog_items.push({
+                                            inlines: [
+                                                {
+                                                    text: changelogItem.description,
+                                                    type: `TextRun`,
+                                                },
+                                            ],
+                                            spacing: `None`,
+                                            type: `RichTextBlock`,
+                                            wrap: true,
+                                        });
+                                    }
+                                    acc.push({ items: changelog_items, type: `Container` });
+                                    return acc;
+                                }, [])) || [],
+                            ];
+                            return { items, type: `Container` };
+                        }),
                     ],
                     msteams: {
                         width: `full`,
@@ -62438,7 +62565,6 @@ const submitNotification = async (webhookBody) => {
     })
         .then((response) => {
         (0, core_1.setOutput)(`webhook-body`, webhookBodyJson);
-        (0, core_1.info)(webhookBodyJson);
         return response;
     })
         .catch(core_1.error);
@@ -62457,6 +62583,16 @@ const formatAndNotify = async (state, conclusion = `in_progress`, elapsedSeconds
             break;
         case `complete`:
             webhookBody = (0, complete_1.formatCompleteLayout)(commit, conclusion, elapsedSeconds);
+            break;
+        case `changelog`:
+            {
+                const commits = await (0, exports.getCommits)();
+                if (commits.length === 0) {
+                    (0, core_1.info)(`No commits found.`);
+                    return;
+                }
+                webhookBody = (0, changelog_1.formatChangelogLayout)(commit, conclusion, elapsedSeconds, commits);
+            }
             break;
         default:
             (0, core_1.setFailed)(`Invalid card layout: ${cardLayout}`);

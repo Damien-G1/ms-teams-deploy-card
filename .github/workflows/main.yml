@@ -12,9 +12,10 @@ jobs:
       - uses: ./
         if: always()
         with:
+          github_context: ${{ toJson(github) }}
           github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           show-on-start: false
           show-on-exit: true
-          card-layout-exit: complete
+          card-layout-exit: changelog
           webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
           timezone: Australia/Brisbane
