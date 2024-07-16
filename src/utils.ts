@@ -4,6 +4,7 @@ import fetch, { Response } from 'node-fetch';
 import moment from 'moment';
 import yaml from 'yaml';
 import { octokit } from 'octokit';
+import Jimp from 'jimp';
 import { PotentialAction, WebhookBody } from './models';
 import { formatCompactLayout } from './layouts/compact';
 import { formatCozyLayout } from './layouts/cozy';
@@ -48,9 +49,121 @@ export const getOctokitCommit = () => {
   });
 };
 
-export const submitNotification = (webhookBody: WebhookBody) => {
+export const submitNotification = async (webhookBody: WebhookBody) => {
   const webhookUri = getInput(`webhook-uri`, { required: true });
-  const webhookBodyJson = JSON.stringify(webhookBody, undefined, 2);
+  // const webhookBodyJson = JSON.stringify(webhookBody, undefined, 2);
+  const {
+    sections,
+    text,
+    themeColor,
+  } = webhookBody;
+
+  // Use Jimp to create a 3x3 image with the themeColor
+  const image = new Jimp(3, 3, themeColor);
+  // Convert the image to a base64 string
+  const themeColorBase64 = await image.getBase64Async(Jimp.MIME_PNG);
+
+  const webhookBodyJson = JSON.stringify({
+    attachments: [{
+      content: {
+        actions: sections.reduce((acc, section) => {
+          if (section.potentialAction) {
+            return [
+              ...acc,
+              ...section.potentialAction.map((action) => ({
+                title: action.name,
+                type: `Action.OpenUrl`,
+                url: action.target[0],
+              })),
+            ];
+          }
+          return acc;
+        }, [] as Array<{ title: string, type: string, url: string }>),
+        backgroundImage: {
+          fillMode: `RepeatHorizontally`,
+          url: themeColorBase64,
+        },
+        body: [
+          ...text ? [
+            {
+              size: `Medium`,
+              text,
+              type: `TextBlock`,
+              weight: `Bolder`,
+              wrap: true,
+            },
+          ] : [],
+          ...sections.map((section) => ({
+            items: [
+              {
+                columns: [
+                  {
+                    items: [
+                      {
+                        size: `Medium`,
+                        style: `Default`,
+                        type: `Image`,
+                        url: section.activityImage,
+                        // style: `Person`,
+                      },
+                    ],
+                    type: `Column`,
+                    width: `auto`,
+                  },
+                  {
+                    items: [
+                      {
+                        height: `stretch`,
+                        maxLines: 2,
+                        spacing: `None`,
+                        text: section.activityTitle,
+                        type: `TextBlock`,
+                        wrap: true,
+                      },
+                      {
+                        isSubtle: true,
+                        spacing: `None`,
+                        text: section.activitySubtitle,
+                        type: `TextBlock`,
+                        wrap: true,
+                      },
+                      // activityText
+                      section.activityText && {
+                        spacing: `None`,
+                        text: section.activityText,
+                        type: `TextBlock`,
+                        wrap: true,
+                      },
+                    ],
+                    type: `Column`,
+                    width: `stretch`,
+                  },
+                ],
+                type: `ColumnSet`,
+              },
+              section.facts && section.facts.length > 0 && {
+                facts: section.facts.map((fact) => ({
+                  title: fact.name,
+                  type: `Fact`,
+                  value: fact.value,
+                })),
+                type: `FactSet`,
+              },
+            ],
+            type: `Container`,
+          })),
+        ],
+        msteams: {
+          width: `full`,
+        },
+        schema: `http://adaptivecards.io/schemas/adaptive-card.json`,
+        type: `AdaptiveCard`,
+        version: `1.4`,
+      },
+      contentType: `application/vnd.microsoft.card.adaptive`,
+    }],
+    type: `message`,
+  }, undefined, 2);
 
   return fetch(webhookUri, {
     body: webhookBodyJson,
