@@ -27,8 +27,9 @@ export const formatChangelogLayout = (
   // Set changelog
   for (const c of commits) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    const escapedMessage = escapeMarkdownTokens(c.commit.message);
-    const [ title, ...messageLines ] = escapedMessage.split(`\n\n`);
+    // const escapedMessage = escapeMarkdownTokens(c.commit.message);
+    const commitMessage = c.commit.message;
+    const [ title, ...messageLines ] = commitMessage.split(`\n\n`);
     const message = messageLines.join(`\n\n`) || ``;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
     const commitShort = c.sha.substring(0, 7) as string;

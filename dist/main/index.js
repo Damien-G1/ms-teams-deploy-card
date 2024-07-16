@@ -61992,7 +61992,6 @@ exports.CONCLUSION_THEMES = {
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.formatChangelogLayout = void 0;
-const utils_1 = __nccwpck_require__(1314);
 const models_1 = __nccwpck_require__(2859);
 const cozy_1 = __nccwpck_require__(7799);
 const formatChangelogLayout = (commit, conclusion, elapsedSeconds, commits) => {
@@ -62002,8 +62001,8 @@ const formatChangelogLayout = (commit, conclusion, elapsedSeconds, commits) => {
     section.facts = [];
     section.changelog = [];
     for (const c of commits) {
-        const escapedMessage = (0, utils_1.escapeMarkdownTokens)(c.commit.message);
-        const [title, ...messageLines] = escapedMessage.split(`\n\n`);
+        const commitMessage = c.commit.message;
+        const [title, ...messageLines] = commitMessage.split(`\n\n`);
         const message = messageLines.join(`\n\n`) || ``;
         const commitShort = c.sha.substring(0, 7);
         section.changelog.push(new models_1.ChangelogItem(title, commitShort, message));
