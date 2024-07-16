@@ -62394,6 +62394,7 @@ const submitNotification = async (webhookBody) => {
     const webhookBodyJson = JSON.stringify({
         attachments: [{
                 content: {
+                    $schema: `http://adaptivecards.io/schemas/adaptive-card.json`,
                     actions: sections.reduce((acc, section) => {
                         if (section.potentialAction) {
                             return [
@@ -62548,7 +62549,6 @@ const submitNotification = async (webhookBody) => {
                     msteams: {
                         width: `full`,
                     },
-                    schema: `http://adaptivecards.io/schemas/adaptive-card.json`,
                     type: `AdaptiveCard`,
                     version: `1.4`,
                 },
