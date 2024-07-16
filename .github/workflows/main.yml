@@ -12,7 +12,7 @@ jobs:
       - uses: ./
         if: always()
         with:
-          github_context: ${{ toJson(github) }}
+          github-context: ${{ toJson(github) }}
           github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           show-on-start: false
           show-on-exit: true

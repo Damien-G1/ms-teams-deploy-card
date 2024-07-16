@@ -76,6 +76,9 @@ inputs:
     description: Allowed number of files to display
     required: false
     default: 7
+  github-context:
+    description: Github context
+    required: false
 
 runs:
   using: node20
