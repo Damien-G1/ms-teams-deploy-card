@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Microsoft Teams Deploy Card",
   "main": "index.ts",
-  "repository": "https://github.com/reediculous456/ms-teams-deploy-card",
+  "repository": "https://github.com/Damien-G1/ms-teams-deploy-card",
   "author": "Wes Reed",
   "license": "MIT",
   "private": false,
