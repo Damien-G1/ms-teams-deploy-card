@@ -18,6 +18,10 @@ A comprehensive notification card in Microsoft Teams for your deployments. Forke
 
 ![Example of Compact Layout](docs/layout-compact.png)
 
+### Changelog
+
+![Example of Changelog Layout](docs/layout-changelog.png)
+
 ## Usage
 
 1. Add `MS_TEAMS_WEBHOOK_URI` on your repository's configs on Settings > Secrets. It is the [webhook URI](https://docs.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook) of the dedicated Microsoft Teams channel for notification.
